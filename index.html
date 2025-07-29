@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <title>Helmholtz线圈磁场仿真</title>
+
+<script>
+  const script = document.createElement('script');
+  script.src = './plotly-latest.min.js';
+  script.onload = () => console.log('本地 Plotly 加载成功');
+  script.onerror = () => {
+    console.warn('本地 Plotly 加载失败，回退到 CDN');
+    const fallback = document.createElement('script');
+    fallback.src = 'https://cdn.plot.ly/plotly-latest.min.js';
+    document.head.appendChild(fallback);
+  };
+  document.head.appendChild(script);
+</script>
+
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      font-family: sans-serif;
+      background-color: #f5f5f5;
+    }
+
+    h2 {
+      text-align: center;
+      font-size: 20px;
+      margin: 10px 0;
+      height: 40px;
+    }
+
+    .grid-container {
+      height: calc(100vh - 60px); /* 除去标题高度 */
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);  /* 3列布局 */
+      grid-template-rows: repeat(2, 1fr);     /* 2行布局 */
+      gap: 10px;
+      padding: 10px;
+      box-sizing: border-box;
+    }
+
+    .grid-item {
+      background-color: #fff;
+      padding: 10px;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .plot-wrapper {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .plot {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: min(100%, 100vh);
+      height: min(100%, 100vw);
+      aspect-ratio: 1 / 1;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);  /* 两列布局 */
+      grid-template-rows: repeat(4, auto);    /* 四行控件 */
+      gap: 10px;
+      font-size: 0.9em;
+    }
+
+    .control {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .control label {
+      font-weight: bold;
+      margin-bottom: 4px;
+      font-size: 0.8em;
+    }
+
+    .control input[type=range] {
+      width: 100%;
+    }
+
+    .control span {
+      text-align: right;
+      font-size: 0.8em;
+      color: #333;
+    }
+
+    .quick-buttons {
+      margin-top: 12px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: space-evenly;
+    }
+
+    .quick-buttons button {
+      padding: 6px 12px;
+      font-size: 0.85em;
+      cursor: pointer;
+      background-color: #eee;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+
+    .quick-buttons button:hover {
+      background-color: #ddd;
+    }
+.header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 15px;
+  height: 40px;
+  background-color: #f5f5f5;
+}
+
+.logo-box img {
+  height: 28px;
+  margin-right: 8px;
+}
+
+.logo-box {
+  display: flex;
+  align-items: center;
+}
+
+.info-box {
+  text-align: right;
+  font-size: 0.75em;
+  color: #555;
+  line-height: 1.1;
+}
+
+  </style>
+</head>
+
+<body>
+<div class="header-bar">
+  <div class="logo-box">
+    <img src="./logo1.png" alt="Logo1">
+    <img src="./logo2.png" alt="Logo2">
+  </div>
+  <h2>Helmholtz线圈磁场仿真系统</h2>
+  <div class="info-box">
+    <div>作者：高振翔</div>
+    <div>指导教师：孙松阳</div>
+    <div>© 2025 GaoZx</div>
+  </div>
+</div>
+  <div class="grid-container">
+    <!-- 控制参数区域 -->
+    <div class="grid-item">
+      参数设置
+      <div class="controls">
+        <div class="control"><label>电流 I (A)</label><input type="range" id="I" min="0.1" max="10" step="0.1" value="3" /><span id="Ival">1.0</span></div>
+        <div class="control"><label>半径 R (m)</label><input type="range" id="R" min="0.05" max="0.2" step="0.01" value="0.1" /><span id="Rval">0.1</span></div>
+        <div class="control"><label>距离 d (m)</label><input type="range" id="d" min="0.05" max="0.3" step="0.01" value="0.1" /><span id="dval">0.1</span></div>
+        <div class="control"><label>匝数 N</label><input type="range" id="N" min="1" max="200" step="1" value="50" /><span id="Nval">50</span></div>
+        <div class="control"><label>网格密度</label><input type="range" id="gridDensity" min="5" max="50" step="1" value="15" /><span id="gridDensityVal">25</span></div>
+        <div class="control"><label>Z轴图 Y轴最大值</label><input type="range" id="ax2YMax" min="0.0001" max="0.01" step="0.0001" value="0.001" /><span id="ax2YMaxVal">0.001</span></div>
+        <div class="control"><label>XOY图颜色最大值</label><input type="range" id="ax3colorMax" min="0.00001" max="0.005" step="0.00001" value="0.005" /><span id="ax3colorMaxVal">0.005</span></div>
+        <div class="control"><label>XOZ图颜色最大值</label><input type="range" id="ax4colorMax" min="0.00001" max="0.005" step="0.00001" value="0.005" /><span id="ax4colorMaxVal">0.005</span></div>
+      </div>
+
+      <!-- 快速增加参数按钮 -->
+      <div class="quick-buttons">
+        <button id="btnI" onclick="toggleIncreasing('I', 0.1, 'btnI', '增加电流 I')">增加电流 I</button>
+        <button id="btnR" onclick="toggleIncreasing('R', 0.005, 'btnR', '增加半径 R')">增加半径 R</button>
+        <button id="btnD" onclick="toggleIncreasing('d', 0.005, 'btnD', '增加距离 d')">增加距离 d</button>
+        <button id="btnN" onclick="toggleIncreasing('N', 1, 'btnN', '增加匝数 N')">增加匝数 N</button>
+      </div>
+    </div>
+
+    <!-- 图表区域 -->
+    <div class="grid-item"><div class="plot-wrapper"><div id="graph5" class="plot"></div></div></div>
+    <div class="grid-item"><div class="plot-wrapper"><div id="graph1" class="plot"></div></div></div>
+    <div class="grid-item"><div class="plot-wrapper"><div id="graph2" class="plot"></div></div></div>
+    <div class="grid-item"><div class="plot-wrapper"><div id="graph3" class="plot"></div></div></div>
+    <div class="grid-item"><div class="plot-wrapper"><div id="graph4" class="plot"></div></div></div>
+  </div>
+
+  <!-- JavaScript 仿真逻辑 -->
+  <script>
+    const μ0 = 4 * Math.PI * 1e-7;
+
+    // 计算单个环形线圈某点的磁场
+    function computeRingField(x, y, z, z0, R, I, N) {
+      let Bx = 0, By = 0, Bz = 0;
+      const Nsteps = 100;
+      for (let i = 0; i < Nsteps; i++) {
+        const theta = 2 * Math.PI * i / Nsteps;
+        const dtheta = 2 * Math.PI / Nsteps;
+        const dl = [-R * Math.sin(theta) * dtheta, R * Math.cos(theta) * dtheta, 0];
+        const rx = x - R * Math.cos(theta);
+        const ry = y - R * Math.sin(theta);
+        const rz = z - z0;
+        const rvec = [rx, ry, rz];
+        const rmag = Math.sqrt(rx**2 + ry**2 + rz**2);
+        if (rmag === 0) continue;
+        const coeff = μ0 * I / (4 * Math.PI * rmag**3);
+        const dB = [
+          coeff * (dl[1]*rvec[2] - dl[2]*rvec[1]),
+          coeff * (dl[2]*rvec[0] - dl[0]*rvec[2]),
+          coeff * (dl[0]*rvec[1] - dl[1]*rvec[0])
+        ];
+        Bx += dB[0]; By += dB[1]; Bz += dB[2];
+      }
+      return [Bx * N, By * N, Bz * N];
+    }
+
+    // 计算两个线圈叠加后的Z轴分量
+    function sumBz(x, y, z, R, I, d, N) {
+      const [,,bz1] = computeRingField(x, y, z, -d/2, R, I, N);
+      const [,,bz2] = computeRingField(x, y, z, d/2, R, I, N);
+      return bz1 + bz2;
+    }
+
+    // 图形更新函数
+    function updatePlots() {
+      const I = parseFloat(Iel.value);
+      const R = parseFloat(Rel.value);
+      const d = parseFloat(del.value);
+      const N = parseInt(Nel.value);
+      const density = parseInt(gridDensityEl.value);
+      const yMax = parseFloat(ax2YMaxEl.value);
+      const cMaxXY = parseFloat(ax3colorMaxEl.value);
+      const cMaxXZ = parseFloat(ax4colorMaxEl.value);
+
+      // 更新滑块显示数值
+      Ival.innerText = I;
+      Rval.innerText = R;
+      dval.innerText = d;
+      Nval.innerText = N;
+      gridDensityVal.innerText = density;
+      ax2YMaxVal.innerText = yMax;
+      ax3colorMaxVal.innerText = cMaxXY;
+      ax4colorMaxVal.innerText = cMaxXZ;
+
+      // Z轴分布图
+      const zvals = Array.from({length: 200}, (_, i) => -0.3 + i * 0.6 / 199);
+      const bzvals = zvals.map(z => sumBz(0, 0, z, R, I, d, N));
+      Plotly.newPlot("graph2", [{
+        x: zvals,
+        y: bzvals,
+        type: 'scatter'
+      }], {
+        title: 'Bz 沿Z轴',
+        xaxis: { title: 'Z轴 (m)' },
+        yaxis: { title: 'Bz (T)', range: [0, yMax] }
+      });
+
+      // XOY 面分布图
+      const lin = Array.from({length: density}, (_, i) => -0.2 + i * 0.4 / (density - 1));
+      const X = [], Y = [], BzXY = [];
+      for (let i = 0; i < lin.length; i++) {
+        const row = [];
+        for (let j = 0; j < lin.length; j++) {
+          row.push(sumBz(lin[j], lin[i], 0, R, I, d, N));
+        }
+        BzXY.push(row);
+        X.push([...lin]);
+        Y.push(Array(lin.length).fill(lin[i]));
+      }
+      Plotly.newPlot("graph3", [{
+        z: BzXY, x: X[0], y: Y.map(r => r[0]),
+        type: 'contour',
+        colorscale: 'Jet',
+        contours: { showlabels: true },
+        zmin: 0,
+        zmax: cMaxXY
+      }], {
+        title: 'XOY 面 Bz',
+        xaxis: { title: 'X (m)' },
+        yaxis: { title: 'Y (m)' }
+      });
+
+      // XOZ 面分布图
+      const Z = [], XZ = [], BzXZ = [];
+      for (let i = 0; i < lin.length; i++) {
+        const row = [];
+        for (let j = 0; j < lin.length; j++) {
+          row.push(sumBz(lin[j], 0, lin[i], R, I, d, N));
+        }
+        BzXZ.push(row);
+        XZ.push([...lin]);
+        Z.push(Array(lin.length).fill(lin[i]));
+      }
+      Plotly.newPlot("graph4", [{
+        z: BzXZ, x: XZ[0], y: Z.map(r => r[0]),
+        type: 'contour',
+        colorscale: 'Jet',
+        contours: { showlabels: true },
+        zmin: -cMaxXZ,
+        zmax: cMaxXZ
+      }], {
+        title: 'XOZ 面 Bz',
+        xaxis: { title: 'X (m)' },
+        yaxis: { title: 'Z (m)' }
+      });
+
+      // 3D磁场矢量图
+      const Xv = [], Yv = [], Zv = [], U = [], V = [], W = [];
+      for (let i = 0; i < lin.length; i += 2) {
+        for (let j = 0; j < lin.length; j += 2) {
+          for (let k = 0; k < lin.length; k += 2) {
+            const x = lin[i], y = lin[j], z = lin[k];
+            const [bx1, by1, bz1] = computeRingField(x, y, z, -d/2, R, I, N);
+            const [bx2, by2, bz2] = computeRingField(x, y, z, d/2, R, I, N);
+            Xv.push(x); Yv.push(y); Zv.push(z);
+            U.push(bx1 + bx2); V.push(by1 + by2); W.push(bz1 + bz2);
+          }
+        }
+      }
+      Plotly.newPlot('graph1', [{
+        type: 'cone', x: Xv, y: Yv, z: Zv, u: U, v: V, w: W,
+        colorscale: 'Blues', sizemode: 'absolute', sizeref: 0.0005, showscale: false
+      }], {
+        title: '3D磁场矢量图',
+        scene: { xaxis: {title: 'X'}, yaxis: {title: 'Y'}, zaxis: {title: 'Z'} }
+      });
+
+      // 绘制线圈位置
+      const theta = Array.from({length: 100}, (_, i) => 2 * Math.PI * i / 100);
+      const xRing = theta.map(t => R * Math.cos(t));
+      const yRing = theta.map(t => R * Math.sin(t));
+      const z1 = Array(theta.length).fill(-d/2);
+      const z2 = Array(theta.length).fill(d/2);
+      Plotly.newPlot('graph5', [
+        {x: xRing, y: yRing, z: z1, mode: 'lines', type: 'scatter3d', line: {color: 'red'}, name: '线圈1'},
+        {x: xRing, y: yRing, z: z2, mode: 'lines', type: 'scatter3d', line: {color: 'blue'}, name: '线圈2'}
+      ], {
+        title: '线圈位置示意图',
+        scene: { xaxis: {title: 'X'}, yaxis: {title: 'Y'}, zaxis: {title: 'Z'} }
+      });
+    }
+
+    // 绑定控件与事件
+    const Iel = document.getElementById("I");
+    const Rel = document.getElementById("R");
+    const del = document.getElementById("d");
+    const Nel = document.getElementById("N");
+    const gridDensityEl = document.getElementById("gridDensity");
+    const ax2YMaxEl = document.getElementById("ax2YMax");
+    const ax3colorMaxEl = document.getElementById("ax3colorMax");
+    const ax4colorMaxEl = document.getElementById("ax4colorMax");
+
+    const Ival = document.getElementById("Ival");
+    const Rval = document.getElementById("Rval");
+    const dval = document.getElementById("dval");
+    const Nval = document.getElementById("Nval");
+    const gridDensityVal = document.getElementById("gridDensityVal");
+    const ax2YMaxVal = document.getElementById("ax2YMaxVal");
+    const ax3colorMaxVal = document.getElementById("ax3colorMaxVal");
+    const ax4colorMaxVal = document.getElementById("ax4colorMaxVal");
+
+    [Iel, Rel, del, Nel, gridDensityEl, ax2YMaxEl, ax3colorMaxEl, ax4colorMaxEl].forEach(el => {
+      el.addEventListener("input", updatePlots);
+    });
+
+    window.onload = updatePlots;
+
+    // 增加按钮逻辑
+    const increaseTimers = {};
+    function toggleIncreasing(id, step, buttonId, defaultLabel) {
+      const button = document.getElementById(buttonId);
+      if (increaseTimers[buttonId]) {
+        clearInterval(increaseTimers[buttonId]);
+        delete increaseTimers[buttonId];
+        button.textContent = defaultLabel;
+      } else {
+        const slider = document.getElementById(id);
+        const display = document.getElementById(id + 'val') || document.getElementById(id + 'Val');
+        increaseTimers[buttonId] = setInterval(() => {
+          let val = parseFloat(slider.value);
+          const max = parseFloat(slider.max);
+          if (val + step <= max) {
+            val += step;
+            slider.value = val;
+            if (display) display.textContent = val.toFixed(4);
+            updatePlots();
+          } else {
+            toggleIncreasing(id, step, buttonId, defaultLabel);
+          }
+        }, 100);
+        button.textContent = "停止";
+      }
+    }
+  </script>
+</body>
+</html>
